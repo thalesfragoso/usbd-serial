@@ -13,7 +13,7 @@
 //! A full example requires the use of a hardware-driver, but the hardware independent part is as
 //! follows:
 //!
-//! ```
+//! ```ignore
 //! let mut serial = SerialPort::new(&usb_bus);
 //!
 //! let mut usb_dev = UsbDeviceBuilder::new(&usb_bus, UsbVidPid(0x16c0, 0x27dd))
@@ -52,7 +52,7 @@ mod buffer;
 mod cdc_acm;
 mod serial_port;
 
-pub use usb_device::{Result, UsbError};
+pub use crate::buffer::{Buffer, DefaultBufferStore};
 pub use crate::cdc_acm::*;
 pub use crate::serial_port::*;
-pub use crate::buffer::DefaultBufferStore;
+pub use usb_device::{Result, UsbError};
