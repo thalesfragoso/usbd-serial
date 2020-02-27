@@ -1,5 +1,9 @@
-use as_slice::{AsMutSlice, AsSlice};
-use core::{cmp, mem::MaybeUninit, ptr, slice};
+use core::{
+    borrow::{Borrow, BorrowMut},
+    cmp,
+    mem::MaybeUninit,
+    ptr, slice,
+};
 
 /// A mediocre buffer that allows for block access without extra copies but memmoves more than
 /// necessary.
@@ -7,13 +11,13 @@ use core::{cmp, mem::MaybeUninit, ptr, slice};
 /// wpos points to the first byte that can be written rpos points at the next byte that can be read
 ///
 /// invariants: 0 <= rpos <= wpos <= data.len()
-pub struct Buffer<S: AsMutSlice<Element = u8>> {
+pub struct Buffer<S: BorrowMut<[u8]>> {
     store: S,
     rpos: usize,
     wpos: usize,
 }
 
-impl<S: AsMutSlice<Element = u8>> Buffer<S> {
+impl<S: BorrowMut<[u8]>> Buffer<S> {
     pub fn new(store: S) -> Self {
         Self {
             store,
@@ -39,7 +43,7 @@ impl<S: AsMutSlice<Element = u8>> Buffer<S> {
     }
 
     fn available_write_without_discard(&self) -> usize {
-        self.store.as_slice().len() - self.wpos
+        self.store.borrow().len() - self.wpos
     }
 
     // Writes as much as possible of data to the buffer and returns the number of bytes written
@@ -55,7 +59,7 @@ impl<S: AsMutSlice<Element = u8>> Buffer<S> {
             return 0;
         }
 
-        self.store.as_mut_slice()[self.wpos..self.wpos + count].copy_from_slice(&data[..count]);
+        self.store.borrow_mut()[self.wpos..self.wpos + count].copy_from_slice(&data[..count]);
 
         self.wpos += count;
         count
@@ -82,7 +86,7 @@ impl<S: AsMutSlice<Element = u8>> Buffer<S> {
 
         assert!(self.available_write_without_discard() >= max_count);
 
-        f(&mut self.store.as_mut_slice()[self.wpos..self.wpos + max_count]).map(|count| {
+        f(&mut self.store.borrow_mut()[self.wpos..self.wpos + max_count]).map(|count| {
             self.wpos += count;
             count
         })
@@ -99,14 +103,14 @@ impl<S: AsMutSlice<Element = u8>> Buffer<S> {
     ) -> Result<usize, E> {
         let count = cmp::min(max_count, self.available_read());
 
-        f(&self.store.as_slice()[self.rpos..self.rpos + count]).map(|count| {
+        f(&self.store.borrow()[self.rpos..self.rpos + count]).map(|count| {
             self.rpos += count;
             count
         })
     }
 
     fn discard_already_read_data(&mut self) {
-        let data = self.store.as_mut_slice();
+        let data = self.store.borrow_mut();
         if self.rpos != data.len() {
             unsafe {
                 ptr::copy(
@@ -135,16 +139,14 @@ impl core::default::Default for DefaultBufferStore {
     }
 }
 
-impl AsSlice for DefaultBufferStore {
-    type Element = u8;
-
-    fn as_slice(&self) -> &[u8] {
+impl Borrow<[u8]> for DefaultBufferStore {
+    fn borrow(&self) -> &[u8] {
         unsafe { slice::from_raw_parts(self.0.as_ptr() as *mut _, 128) }
     }
 }
 
-impl AsMutSlice for DefaultBufferStore {
-    fn as_mut_slice(&mut self) -> &mut [u8] {
+impl BorrowMut<[u8]> for DefaultBufferStore {
+    fn borrow_mut(&mut self) -> &mut [u8] {
         unsafe { slice::from_raw_parts_mut(self.0.as_mut_ptr() as *mut _, 128) }
     }
 }

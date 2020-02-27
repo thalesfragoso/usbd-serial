@@ -1,8 +1,6 @@
 use crate::buffer::{Buffer, DefaultBufferStore};
 use crate::cdc_acm::*;
-use as_slice::AsMutSlice;
-use core::mem::MaybeUninit;
-use core::slice;
+use core::{borrow::BorrowMut, mem::MaybeUninit, slice};
 use usb_device::class_prelude::*;
 use usb_device::Result;
 
@@ -13,8 +11,8 @@ use usb_device::Result;
 pub struct SerialPort<'a, B, RS = DefaultBufferStore, WS = DefaultBufferStore>
 where
     B: UsbBus,
-    RS: AsMutSlice<Element = u8>,
-    WS: AsMutSlice<Element = u8>,
+    RS: BorrowMut<[u8]>,
+    WS: BorrowMut<[u8]>,
 {
     inner: CdcAcmClass<'a, B>,
     read_buf: Buffer<RS>,
@@ -66,8 +64,8 @@ where
 impl<B, RS, WS> SerialPort<'_, B, RS, WS>
 where
     B: UsbBus,
-    RS: AsMutSlice<Element = u8>,
-    WS: AsMutSlice<Element = u8>,
+    RS: BorrowMut<[u8]>,
+    WS: BorrowMut<[u8]>,
 {
     /// Creates a new USB serial port with the provided UsbBus and buffer backing stores.
     pub fn new_with_store(
@@ -150,13 +148,11 @@ where
             return Err(UsbError::WouldBlock);
         }
 
-        let r = buf.read(data.len(), |buf_data| {
-            &data[..buf_data.len()].copy_from_slice(buf_data);
+        buf.read(data.len(), |buf_data| {
+            data[..buf_data.len()].copy_from_slice(buf_data);
 
             Ok(buf_data.len())
-        });
-
-        r
+        })
     }
 
     /// Sends as much as possible of the current write buffer. Returns `Ok` if all data that has
@@ -217,8 +213,8 @@ where
 impl<B, RS, WS> UsbClass<B> for SerialPort<'_, B, RS, WS>
 where
     B: UsbBus,
-    RS: AsMutSlice<Element = u8>,
-    WS: AsMutSlice<Element = u8>,
+    RS: BorrowMut<[u8]>,
+    WS: BorrowMut<[u8]>,
 {
     fn get_configuration_descriptors(&self, writer: &mut DescriptorWriter) -> Result<()> {
         self.inner.get_configuration_descriptors(writer)
@@ -249,8 +245,8 @@ where
 impl<B, RS, WS> embedded_hal::serial::Write<u8> for SerialPort<'_, B, RS, WS>
 where
     B: UsbBus,
-    RS: AsMutSlice<Element = u8>,
-    WS: AsMutSlice<Element = u8>,
+    RS: BorrowMut<[u8]>,
+    WS: BorrowMut<[u8]>,
 {
     type Error = UsbError;
 
@@ -274,8 +270,8 @@ where
 impl<B, RS, WS> embedded_hal::serial::Read<u8> for SerialPort<'_, B, RS, WS>
 where
     B: UsbBus,
-    RS: AsMutSlice<Element = u8>,
-    WS: AsMutSlice<Element = u8>,
+    RS: BorrowMut<[u8]>,
+    WS: BorrowMut<[u8]>,
 {
     type Error = UsbError;
 
