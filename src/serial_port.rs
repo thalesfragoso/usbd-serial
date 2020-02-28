@@ -22,10 +22,10 @@ where
 
 /// If this many full size packets have been sent in a row, a short packet will be sent so that the
 /// host sees the data in a timely manner.
-const SHORT_PACKET_INTERVAL: usize = 10;
+pub(crate) const SHORT_PACKET_INTERVAL: usize = 10;
 
 /// Keeps track of the type of the last written packet.
-enum WriteState {
+pub(crate) enum WriteState {
     /// No packets in-flight
     Idle,
 

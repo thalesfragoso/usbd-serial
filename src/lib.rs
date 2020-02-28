@@ -50,9 +50,22 @@
 
 mod buffer;
 mod cdc_acm;
+mod pool_serial;
 mod serial_port;
 
 pub use crate::buffer::{Buffer, DefaultBufferStore};
 pub use crate::cdc_acm::*;
+pub use crate::pool_serial::{PoolNode, PoolPort};
 pub use crate::serial_port::*;
 pub use usb_device::{Result, UsbError};
+
+pub mod heapless {
+    pub use heapless::{
+        pool,
+        pool::singleton::{Box, Pool},
+    };
+}
+
+pub mod typenum {
+    pub use generic_array::typenum::consts;
+}
