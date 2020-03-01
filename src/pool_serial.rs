@@ -56,10 +56,11 @@ where
     /// Gives a `&mut [u8]` slice to write into with the maximum size, the `commit` method
     /// must then be used to set the actual number of bytes written.
     ///
-    /// Note that this function internally first zeros the node's buffer.
+    /// Note that this function internally first zeros the non-initialized elements of the node's
+    /// buffer.
     pub fn write(&mut self) -> &mut [u8] {
         // Initialize memory with a safe value
-        for elem in self.buf.iter_mut() {
+        for elem in self.buf.iter_mut().skip(self.len) {
             *elem = MaybeUninit::zeroed();
         }
         self.len = N::USIZE; // Set to max so `commit` may shrink it if needed
@@ -82,7 +83,7 @@ where
     ///
     /// If the node is already partially filled, this will continue filling the node.
     pub fn write_slice(&mut self, buf: &[u8]) -> usize {
-        let free = N::USIZE - self.len as usize;
+        let free = N::USIZE - self.len;
         let new_size = buf.len();
         let count = if new_size > free { free } else { new_size };
 
@@ -129,6 +130,7 @@ where
     //    self.buf.as_slice().as_ptr() as u32
     //}
 
+    /// Returns the maximum length of the internal buffer.
     pub fn max_len() -> usize {
         N::USIZE
     }
@@ -214,7 +216,11 @@ where
 
     /// Checks if the writer buffer is empty
     pub fn writer_empty(&self) -> bool {
-        self.write_buf.is_none()
+        if let Some(ref buf) = self.write_buf {
+            buf.len() == 0
+        } else {
+            true
+        }
     }
 
     /// Returns the length of the writer buffer
@@ -236,7 +242,11 @@ where
 
     /// Checks if the reader buffer is empty
     pub fn reader_empty(&self) -> bool {
-        self.read_buf.is_none()
+        if let Some(ref buf) = self.read_buf {
+            buf.len() == 0
+        } else {
+            true
+        }
     }
 
     /// Returns the length of the reader buffer
