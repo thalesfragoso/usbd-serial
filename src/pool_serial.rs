@@ -70,6 +70,25 @@ where
         }
     }
 
+    /// Gives the underling buffer to be modified and the already initialized length, the user is
+    /// is free to modify it, but must return the correct number of uninitialized elements that
+    /// were initialized.
+    ///
+    /// # Safety
+    /// The user must provide the correct number of newer initialized elements, otherwise there will
+    /// be a risk of accessing uninitialized data, which is undefined behavior.
+    pub unsafe fn write_with(
+        &mut self,
+        f: impl FnOnce(&mut GenericArray<MaybeUninit<u8>, N>, usize) -> usize,
+    ) {
+        let count = f(&mut self.buf, self.len);
+        self.len = if count + self.len > N::USIZE {
+            N::USIZE
+        } else {
+            self.len + count
+        }
+    }
+
     /// Used to shrink the current size of the slice in the node, mostly used in conjunction
     /// with `write`.
     pub fn commit(&mut self, shrink_to: usize) {
@@ -240,6 +259,14 @@ where
         old
     }
 
+    /// Clears the writer buffer
+    pub fn clear_writer(&mut self) {
+        self.written_count = 0;
+        if let Some(ref mut buf) = self.write_buf {
+            buf.clear();
+        }
+    }
+
     /// Checks if the reader buffer is empty
     pub fn reader_empty(&self) -> bool {
         if let Some(ref buf) = self.read_buf {
@@ -264,6 +291,14 @@ where
         let old = self.read_buf.take();
         self.read_buf = new;
         old
+    }
+
+    /// Clears reader buffer
+    pub fn clear_reader(&mut self) {
+        self.read_count = 0;
+        if let Some(ref mut buf) = self.read_buf {
+            buf.clear();
+        }
     }
 
     /// Writes bytes from `data` into the port and returns the number of bytes written.
@@ -441,14 +476,25 @@ mod tests {
     //extern crate std;
 
     use crate::pool_serial::PoolNode;
+    use crate::typenum::consts::U8;
 
-    const DATA: &[u8] = &[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+    const DATA: &[u8] = &[1, 2, 3, 4, 5, 6, 7, 8];
     #[test]
     fn write_read() {
         let mut node = PoolNode::new_default();
         let written = node.write_slice(DATA);
-        assert_eq!(written, 12);
-        assert_eq!(node.len(), 12);
+        assert_eq!(written, DATA.len());
+        assert_eq!(node.len(), DATA.len());
         assert_eq!(node.read(), DATA);
+    }
+
+    #[test]
+    fn generic_node() {
+        let mut node = PoolNode::<U8>::new();
+        let written = node.write_slice(DATA);
+        assert_eq!(written, DATA.len());
+        assert_eq!(node.len(), DATA.len());
+        assert_eq!(node.read(), DATA);
+        assert_eq!(PoolNode::<U8>::max_len(), 8);
     }
 }
